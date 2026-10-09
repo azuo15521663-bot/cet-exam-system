@@ -1,0 +1,1222 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>大学英语四六级全真模考系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Noto Sans SC', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .exam-shadow { box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        .option-hover:hover { background-color: #f0f7ff; border-color: #3b82f6; }
+        .option-selected { background-color: #eff6ff; border-color: #3b82f6; }
+        .option-correct { background-color: #f0fdf4; border-color: #22c55e; }
+        .option-wrong { background-color: #fef2f2; border-color: #ef4444; }
+        .nav-answered { background-color: #3b82f6; color: white; }
+        .nav-marked { background-color: #f59e0b; color: white; }
+        .nav-current { border: 2px solid #1d4ed8; font-weight: bold; }
+        .timer-warning { color: #ef4444; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .slide-up { animation: slideUp 0.3s ease-out; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+        .question-type-badge { font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; }
+        .listening-badge { background: #dbeafe; color: #1d4ed8; }
+        .reading-badge { background: #dcfce7; color: #166534; }
+        .translation-badge { background: #fef3c7; color: #92400e; }
+        .writing-badge { background: #f3e8ff; color: #7c3aed; }
+        .stat-card { transition: transform 0.2s, box-shadow 0.2s; }
+        .stat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 25px rgba(0,0,0,0.1); }
+        .btn-primary { transition: all 0.2s; }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4); }
+        .btn-primary:active { transform: translateY(0); }
+        .modal-overlay { background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
+        .chart-bar { transition: width 0.8s ease-out; }
+        .wrong-tag { background: #fee2e2; color: #991b1b; }
+        .correct-tag { background: #dcfce7; color: #166534; }
+        .mark-tag { background: #fef3c7; color: #92400e; }
+        input[type="checkbox"], input[type="radio"] { accent-color: #3b82f6; }
+        .exam-content p { margin-bottom: 0.75rem; line-height: 1.7; }
+        .passage-text { line-height: 1.8; text-align: justify; }
+        .option-label { min-width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 600; margin-right: 8px; }
+        .option-default .option-label { background: #e5e7eb; color: #374151; }
+        .option-selected .option-label { background: #3b82f6; color: white; }
+        .option-correct .option-label { background: #22c55e; color: white; }
+        .option-wrong .option-label { background: #ef4444; color: white; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- 顶部导航栏 -->
+    <nav id="topNav" class="bg-white shadow-sm sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-14">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                        </svg>
+                    </div>
+                    <span class="font-bold text-gray-800 text-lg hidden sm:block">CET 全真模考系统</span>
+                    <span class="font-bold text-gray-800 text-sm sm:hidden">CET 模考</span>
+                    <div class="flex items-center bg-gray-100 rounded-full p-0.5 ml-3">
+                        <button onclick="app.switchLevel('cet4')" id="btnCet4" class="px-3 py-1 rounded-full text-xs font-medium transition ${app.currentLevel==='cet4'?'bg-blue-600 text-white':'text-gray-600 hover:text-gray-900'}">四级</button>
+                        <button onclick="app.switchLevel('cet6')" id="btnCet6" class="px-3 py-1 rounded-full text-xs font-medium transition ${app.currentLevel==='cet6'?'bg-purple-600 text-white':'text-gray-600 hover:text-gray-900'}">六级</button>
+                    </div>
+                </div>
+                <div id="navTimer" class="hidden items-center space-x-2 bg-gray-900 text-white px-4 py-1.5 rounded-full">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span id="timerDisplay" class="font-mono font-bold text-lg">00:00:00</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="app.showPage('dashboard')" id="navHomeBtn" class="text-gray-600 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition">首页</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主内容区 -->
+    <main id="mainContent" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <!-- 页面内容动态渲染 -->
+    </main>
+
+    <!-- 模态框 -->
+    <div id="modal" class="fixed inset-0 z-[100] hidden items-center justify-center modal-overlay p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 slide-up">
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <!-- 提示框 -->
+    <div id="toast" class="fixed top-20 left-1/2 transform -translate-x-1/2 z-[110] hidden">
+        <div class="bg-gray-900 text-white px-6 py-3 rounded-xl shadow-lg flex items-center space-x-2 slide-up">
+            <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+            <span id="toastText">操作成功</span>
+        </div>
+    </div>
+
+<script>
+// ==================== 题库数据 (45题) ====================
+const questionBank = [
+    // 听力部分 (15题) - 四级
+    { id: 1, type: 'listening', level: 'cet4', section: 'Section A', question: 'W: I\'m looking for a textbook for my psychology course. It\'s called "Introduction to Behavioral Psychology". Do you have it in stock?\nM: Let me check... Yes, we have one copy left. It\'s on the second floor in the social sciences section.\nQ: Where is the woman most likely to find the textbook?', options: ['In the psychology department', 'On the second floor of the store', 'In the behavioral sciences section', 'On the first floor near the entrance'], answer: [1], analysis: '对话中男士明确提到教科书在二楼社会科学区域（the second floor in the social sciences section），因此选B。A选项心理系未提及；C选项行为科学区域说法错误；D选项一楼入口附近与原文相反。', score: 7.1 },
+    { id: 2, type: 'listening', level: 'cet4', section: 'Section A', question: 'M: Could you tell me how to get to the nearest subway station?\nW: Go straight down this street for two blocks, then turn left at the traffic lights. You\'ll see it right in front of you.\nQ: What should the man do at the traffic lights?', options: ['Turn right', 'Turn left', 'Go straight', 'Turn around'], answer: [1], analysis: '女士指路时说"turn left at the traffic lights"（在红绿灯处左转），因此选B。', score: 7.1 },
+    { id: 3, type: 'listening', level: 'cet4', section: 'Section A', question: 'W: The lecture on environmental protection has been moved from Room 301 to the main auditorium.\nM: That\'s great! The auditorium has better acoustics and more seats.\nQ: What does the man think of the change?', options: ['He is disappointed', 'He is indifferent', 'He approves of it', 'He is surprised'], answer: [2], analysis: '男士说"That\'s great!"表示赞同，并解释了优点（更好的音响效果和更多座位），因此选C（赞成）。', score: 7.1 },
+    { id: 4, type: 'listening', level: 'cet4', section: 'Section A', question: 'M: The research paper is due next Friday. Have you started working on it yet?\nW: I\'ve finished the outline and collected most of the references, but I haven\'t written the first draft.\nQ: What has the woman completed so far?', options: ['The first draft', 'The outline and references', 'The final version', 'The presentation'], answer: [1], analysis: '女士说完成了大纲（outline）并收集了大部分参考文献（references），但还没写初稿，因此选B。', score: 7.1 },
+    { id: 5, type: 'listening', level: 'cet4', section: 'Section A', question: 'W: I heard you got a promotion at work. Congratulations!\nM: Thanks, but it means I\'ll have to relocate to the branch office in Chicago next month.\nQ: What will the man do next month?', options: ['Start a new job', 'Move to Chicago', 'Take a vacation', 'Visit a branch office'], answer: [1], analysis: '男士说"relocate to the branch office in Chicago"（搬到芝加哥分公司），relocate意为搬迁、调动，因此选B。', score: 7.1 },
+    { id: 6, type: 'listening', level: 'cet4', section: 'Section B', question: 'M: Our flight has been delayed due to heavy fog. The new departure time is 3:45 PM.\nW: That means we\'ll miss our connecting flight in Denver. We\'d better speak to the agent about rebooking.\nQ: What is the cause of the flight delay?', options: ['Technical problems', 'Bad weather', 'Air traffic control', 'Crew shortage'], answer: [1], analysis: '男士明确说延误原因是"heavy fog"（大雾），属于天气原因，因此选B。', score: 7.1 },
+    { id: 7, type: 'listening', level: 'cet4', section: 'Section B', question: 'W: Professor Smith, I\'m having trouble understanding the statistical analysis section of my thesis.\nM: Why don\'t you make an appointment with the teaching assistant? He specializes in quantitative methods.\nQ: What does the professor suggest the woman do?', options: ['Rewrite the thesis', 'Consult the teaching assistant', 'Take a statistics course', 'Change her topic'], answer: [1], analysis: '教授建议"make an appointment with the teaching assistant"（预约助教），因为助教擅长定量方法，因此选B。', score: 7.1 },
+    { id: 8, type: 'listening', level: 'cet4', section: 'Section B', question: 'M: The new employee orientation will be held on Monday morning instead of Tuesday afternoon.\nW: Will the HR department notify everyone about the schedule change?\nQ: What does the woman want to know?', options: ['When the orientation starts', 'Where the orientation is held', 'If people will be informed of the change', 'Who will attend the orientation'], answer: [2], analysis: '女士问的是HR部门是否会通知所有人时间变更，即她想知道大家是否会被告知，因此选C。', score: 7.1 },
+    { id: 9, type: 'listening', level: 'cet4', section: 'Section B', question: 'W: I\'ve been trying to reach the customer service department all morning, but the line is always busy.\nM: You might want to try their online chat support. It\'s usually much faster.\nQ: What does the man recommend?', options: ['Calling back later', 'Sending an email', 'Using online chat support', 'Visiting the office in person'], answer: [2], analysis: '男士建议尝试"online chat support"（在线聊天支持），因此选C。', score: 7.1 },
+    { id: 10, type: 'listening', level: 'cet4', section: 'Section B', question: 'M: The museum is offering a special exhibition on ancient Egyptian artifacts this month.\nW: Really? I\'ve always been fascinated by ancient civilizations. Let\'s go this weekend.\nQ: What does the woman want to do this weekend?', options: ['Study ancient history', 'Visit the museum exhibition', 'Travel to Egypt', 'Buy artifacts'], answer: [1], analysis: '女士提议"Let\'s go this weekend"，指的是去参观博物馆的古埃及文物特展，因此选B。', score: 7.1 },
+    { id: 11, type: 'listening', level: 'cet4', section: 'Section C', question: 'Passage: Online education has transformed the way people learn. With the advent of high-speed internet and mobile devices, students can now access courses from anywhere in the world. However, this convenience comes with challenges. Many students struggle with self-discipline when studying remotely. Without the structure of a traditional classroom, procrastination becomes a significant obstacle.\nQ: What is the main challenge of online education mentioned in the passage?', options: ['Lack of internet access', 'High tuition costs', 'Self-discipline issues', 'Limited course options'], answer: [2], analysis: '短文明确提到"Many students struggle with self-discipline"（许多学生难以自律），这是在线教育的主要挑战，因此选C。', score: 7.1 },
+    { id: 12, type: 'listening', level: 'cet4', section: 'Section C', question: 'Passage: The city council has approved a new plan to build more bike lanes throughout the downtown area. The project aims to reduce traffic congestion and promote environmentally friendly transportation. Construction will begin next spring and is expected to be completed within two years. Local businesses have expressed mixed reactions to the plan.\nQ: What is the purpose of building more bike lanes?', options: ['To create construction jobs', 'To reduce traffic and promote green transport', 'To increase parking spaces', 'To attract more tourists'], answer: [1], analysis: '短文提到项目目的是"reduce traffic congestion and promote environmentally friendly transportation"（减少交通拥堵并促进环保交通），因此选B。', score: 7.1 },
+    { id: 13, type: 'listening', level: 'cet4', section: 'Section C', question: 'Passage: A recent study suggests that taking short breaks during work can significantly improve productivity. Researchers found that employees who took a five-minute break every hour were more focused and produced higher quality work than those who worked continuously. The study recommends that companies encourage regular breaks to boost overall performance.\nQ: According to the study, what should companies do?', options: ['Extend working hours', 'Encourage regular breaks', 'Hire more employees', 'Reduce workload'], answer: [1], analysis: '短文最后建议"companies encourage regular breaks"（公司应鼓励定期休息），因此选B。', score: 7.1 },
+    { id: 14, type: 'listening', level: 'cet4', section: 'Section C', question: 'Passage: Climate change is affecting agricultural production worldwide. Rising temperatures and unpredictable rainfall patterns have made it difficult for farmers to plan their crops. Some regions are experiencing longer droughts, while others face increased flooding. Scientists are developing new crop varieties that can withstand these extreme weather conditions.\nQ: What are scientists doing to address the agricultural challenges?', options: ['Building irrigation systems', 'Developing weather-resistant crops', 'Predicting rainfall patterns', 'Relocating farms to cities'], answer: [1], analysis: '短文提到科学家正在"developing new crop varieties that can withstand extreme weather conditions"（开发能抵御极端天气的新作物品种），即选B。', score: 7.1 },
+    { id: 15, type: 'listening', level: 'cet4', section: 'Section C', question: 'Passage: The university library will extend its opening hours during the final exam period. Starting next week, the library will open at 7 AM and close at midnight, seven days a week. Additional study rooms will also be available on the third floor. Students are encouraged to reserve study rooms in advance through the library website.\nQ: How should students secure a study room?', options: ['Arrive early to queue', 'Reserve online in advance', 'Ask the librarian for help', 'Use student ID to access'], answer: [1], analysis: '短文最后说"reserve study rooms in advance through the library website"（通过图书馆网站提前预约自习室），因此选B。', score: 7.1 },
+
+    // 阅读部分 (20题)
+    { id: 16, type: 'reading', level: 'cet4', section: '选词填空', question: 'The rapid development of artificial intelligence has _______ numerous ethical concerns among scientists and policymakers.', options: ['raised', 'risen', 'aroused', 'arisen'], answer: [0], analysis: 'raised concerns是固定搭配，意为"引发担忧"。rise（上升）和arise（出现）是不及物动词，不能接宾语；arouse通常搭配interest/suspicion等，但raise concerns更常用。', score: 3.55 },
+    { id: 17, type: 'reading', level: 'cet4', section: '选词填空', question: 'The government has implemented a series of policies to _______ economic growth in the region.', options: ['stimulate', 'simulate', 'accumulate', 'formulate'], answer: [0], analysis: 'stimulate economic growth意为"刺激经济增长"。simulate（模拟）、accumulate（积累）、formulate（制定）均不符合语境。', score: 3.55 },
+    { id: 18, type: 'reading', level: 'cet4', section: '选词填空', question: 'Her argument was so _______ that even her opponents had to admit she made a valid point.', options: ['compelling', 'compulsory', 'competitive', 'comprehensive'], answer: [0], analysis: 'compelling意为"有说服力的"。compulsory（强制的）、competitive（竞争的）、comprehensive（全面的）均不符合句意。', score: 3.55 },
+    { id: 19, type: 'reading', level: 'cet4', section: '选词填空', question: 'The company decided to _______ its outdated equipment with the latest technology.', options: ['replace', 'displace', 'misplace', 'place'], answer: [0], analysis: 'replace...with...意为"用...替换..."。displace（取代，常指被迫离开）、misplace（放错地方）不符合。', score: 3.55 },
+    { id: 20, type: 'reading', level: 'cet4', section: '选词填空', question: 'The research findings were _______ in a prestigious scientific journal last month.', options: ['published', 'publicized', 'printed', 'announced'], answer: [0], analysis: 'publish findings意为"发表研究成果"，是学术规范用语。publicize（宣传）强调广告效应；print（印刷）范围太窄；announce（宣布）不够正式。', score: 3.55 },
+    { id: 21, type: 'reading', level: 'cet4', section: '长篇阅读', question: 'Passage: The concept of "emotional intelligence" (EI) was first introduced by psychologists Peter Salovey and John Mayer in 1990. It refers to the ability to perceive, understand, manage, and use emotions effectively. Unlike traditional IQ, which measures cognitive abilities, EI focuses on emotional and social skills. Research has shown that individuals with high EI tend to perform better in leadership roles, have stronger interpersonal relationships, and experience greater overall well-being. In the workplace, EI has become a valuable asset, with many companies now incorporating EI training into their professional development programs.\nQ: Who first introduced the concept of emotional intelligence?', options: ['Daniel Goleman', 'Peter Salovey and John Mayer', 'Howard Gardner', 'Sigmund Freud'], answer: [1], analysis: '文章第一句明确指出是Peter Salovey和John Mayer于1990年首次提出，因此选B。Daniel Goleman是推广者而非首创者。', score: 7.1 },
+    { id: 22, type: 'reading', level: 'cet4', section: '长篇阅读', question: 'Passage: Urban farming, the practice of cultivating food in cities, has gained significant popularity in recent years. Rooftop gardens, vertical farms, and community allotments are transforming urban landscapes. Proponents argue that urban farming reduces food miles, improves food security, and creates green spaces that benefit mental health. However, critics point out that urban agriculture faces challenges such as soil contamination, limited space, and high startup costs. Despite these obstacles, many cities worldwide are investing in urban farming initiatives as part of their sustainability strategies.\nQ: What is a challenge mentioned regarding urban farming?', options: ['Lack of consumer interest', 'Soil contamination', 'Excessive government regulation', 'Shortage of farmers'], answer: [1], analysis: '文章提到挑战包括"soil contamination, limited space, and high startup costs"（土壤污染、空间有限、启动成本高），因此选B。', score: 7.1 },
+    { id: 23, type: 'reading', level: 'cet4', section: '长篇阅读', question: 'Passage: The digital nomad lifestyle, enabled by remote work technology, allows professionals to work from anywhere in the world. Popular destinations include Bali, Chiang Mai, and Lisbon, where the cost of living is relatively low and internet connectivity is reliable. Digital nomads often cite improved work-life balance and cultural enrichment as key benefits. However, this lifestyle also presents challenges such as visa restrictions, unstable income, and the lack of a permanent social network. Some countries have responded by introducing special digital nomad visas to attract these mobile workers.\nQ: Why have some countries introduced special visas?', options: ['To increase tourism revenue', 'To attract digital nomads', 'To regulate immigration', 'To promote local employment'], answer: [1], analysis: '文章最后一句说"Some countries have responded by introducing special digital nomad visas to attract these mobile workers"（一些国家推出特殊签证以吸引数字游民），因此选B。', score: 7.1 },
+    { id: 24, type: 'reading', level: 'cet4', section: '长篇阅读', question: 'Passage: The placebo effect is a fascinating phenomenon in medical science. When patients receive a treatment with no therapeutic value, such as a sugar pill, they often experience real improvements in their condition simply because they believe they are receiving effective treatment. This psychological response can be so powerful that placebos are used as controls in clinical trials to test new drugs. Recent research suggests that the placebo effect involves complex interactions between the brain, expectation, and the body\'s natural healing mechanisms.\nQ: What is the placebo effect?', options: ['A side effect of medication', 'Improvement due to belief in treatment', 'A type of clinical trial', 'A new drug therapy'], answer: [1], analysis: '文章定义安慰剂效应为"patients often experience real improvements simply because they believe they are receiving effective treatment"（患者因相信治疗有效而出现真实改善），因此选B。', score: 7.1 },
+    { id: 25, type: 'reading', level: 'cet4', section: '长篇阅读', question: 'Passage: Minimalism, as a lifestyle choice, advocates for living with fewer possessions and focusing on what truly matters. Followers of minimalism often declutter their homes, reduce consumption, and prioritize experiences over material goods. This movement has gained traction in response to consumer culture and environmental concerns. Minimalists argue that owning less leads to greater freedom, reduced stress, and increased financial savings. Critics, however, suggest that minimalism can be a privilege not accessible to those with limited resources.\nQ: What do minimalists prioritize?', options: ['Material wealth', 'Consumer goods', 'Experiences over possessions', 'Social status'], answer: [2], analysis: '文章说"prioritize experiences over material goods"（优先考虑体验而非物质商品），因此选C。', score: 7.1 },
+    { id: 26, type: 'reading', level: 'cet4', section: '仔细阅读', question: 'Passage: The Internet of Things (IoT) refers to the network of physical devices embedded with sensors, software, and connectivity that enables them to exchange data. Smart homes, wearable fitness trackers, and connected cars are all examples of IoT applications. While IoT offers unprecedented convenience and efficiency, it also raises significant privacy and security concerns. Hackers can potentially access personal data through vulnerable devices, and the sheer volume of data collected raises questions about surveillance and data ownership. As IoT continues to expand, addressing these security challenges will be crucial for widespread adoption.\nQ: What is a major concern associated with IoT?', options: ['High cost of devices', 'Privacy and security risks', 'Lack of standardization', 'Limited battery life'], answer: [1], analysis: '文章提到"raises significant privacy and security concerns"（引发重大隐私和安全担忧），因此选B。', score: 14.2 },
+    { id: 27, type: 'reading', level: 'cet4', section: '仔细阅读', question: 'Passage: The gig economy, characterized by short-term contracts and freelance work, has reshaped traditional employment relationships. Platforms like Uber, TaskRabbit, and Upwork connect workers with clients on a per-job basis. Supporters praise the flexibility and autonomy that gig work offers, allowing individuals to set their own schedules and pursue multiple income streams. Critics, however, argue that gig workers lack job security, benefits, and labor protections afforded to traditional employees. The debate over whether gig workers should be classified as employees or independent contractors continues in courts and legislatures worldwide.\nQ: What is a criticism of the gig economy?', options: ['It limits income potential', 'It reduces work flexibility', 'Workers lack security and benefits', 'It requires too much training'], answer: [2], analysis: '文章批评点在于"gig workers lack job security, benefits, and labor protections"（零工工作者缺乏工作保障、福利和劳动保护），因此选C。', score: 14.2 },
+    { id: 28, type: 'reading', level: 'cet4', section: '仔细阅读', question: 'Passage: Mindfulness meditation, rooted in ancient Buddhist practices, has gained mainstream acceptance in Western psychology and medicine. The practice involves paying deliberate attention to the present moment without judgment. Clinical studies have demonstrated that mindfulness can reduce stress, anxiety, and depression while improving attention and emotional regulation. Major corporations now offer mindfulness programs to employees, and schools are incorporating mindfulness into their curricula. Despite its popularity, some researchers caution that more rigorous studies are needed to fully understand its long-term effects and mechanisms.\nQ: What do some researchers suggest about mindfulness?', options: ['It should be banned in schools', 'More rigorous research is needed', 'It has no real benefits', 'It is only suitable for adults'], answer: [1], analysis: '文章最后提到"some researchers caution that more rigorous studies are needed"（一些研究者警告需要更严谨的研究），因此选B。', score: 14.2 },
+    { id: 29, type: 'reading', level: 'cet4', section: '仔细阅读', question: 'Passage: The circular economy is an economic model designed to eliminate waste and promote the continual use of resources. Unlike the traditional linear economy (take-make-dispose), the circular model emphasizes reuse, repair, refurbishment, and recycling. Products are designed for durability and eventual disassembly, allowing materials to be recovered and regenerated. This approach not only reduces environmental impact but also creates new business opportunities and jobs. Major companies like Philips and Renault have adopted circular principles, and the European Union has made the circular economy a key policy objective.\nQ: What is a key principle of the circular economy?', options: ['Maximizing consumption', 'Eliminating waste through reuse and recycling', 'Increasing production speed', 'Reducing product quality'], answer: [1], analysis: '文章定义循环经济为"designed to eliminate waste and promote the continual use of resources"（旨在消除浪费并促进资源持续利用），强调reuse, repair, recycling，因此选B。', score: 14.2 },
+    { id: 30, type: 'reading', level: 'cet4', section: '仔细阅读', question: 'Passage: Genetic engineering, particularly CRISPR-Cas9 technology, has revolutionized biological research and medicine. This tool allows scientists to edit DNA with unprecedented precision, potentially curing genetic diseases and improving crop yields. However, the technology also raises ethical questions, particularly regarding human embryo editing and the potential for "designer babies." The scientific community remains divided on where to draw the line between therapeutic applications and enhancement. International guidelines and regulations are still evolving to keep pace with the rapid advancement of gene-editing capabilities.\nQ: What is a major ethical concern about CRISPR technology?', options: ['Its high cost', 'Human embryo editing and designer babies', 'Its inefficiency', 'Lack of public awareness'], answer: [1], analysis: '文章提到伦理问题涉及"human embryo editing and the potential for designer babies"（人类胚胎编辑和设计婴儿），因此选B。', score: 14.2 },
+    { id: 31, type: 'reading', level: 'cet4', section: '仔细阅读', question: 'Passage: The sharing economy, exemplified by companies like Airbnb and Uber, allows individuals to monetize their assets, whether spare rooms or vehicles. This model has disrupted traditional industries and created new economic opportunities. Supporters argue that it promotes efficient resource utilization and provides flexible income options. However, traditional businesses complain about unfair competition, as sharing economy platforms often operate with fewer regulatory obligations. Cities around the world are grappling with how to regulate these new business models while balancing innovation and consumer protection.\nQ: What do traditional businesses complain about regarding the sharing economy?', options: ['Poor service quality', 'Unfair competition due to fewer regulations', 'High prices', 'Lack of innovation'], answer: [1], analysis: '文章说传统企业抱怨"unfair competition, as sharing economy platforms often operate with fewer regulatory obligations"（不公平竞争，因为共享经济平台监管义务更少），因此选B。', score: 14.2 },
+    { id: 32, type: 'reading', level: 'cet4', section: '仔细阅读', question: 'Passage: Artificial intelligence is increasingly being used in healthcare diagnostics. Machine learning algorithms can analyze medical images, such as X-rays and MRIs, with accuracy comparable to or exceeding that of human radiologists. AI systems can detect patterns that might be missed by the human eye and can process vast amounts of data quickly. However, challenges remain, including the need for large, high-quality datasets, concerns about algorithmic bias, and questions about liability when AI makes errors. Many experts believe AI will augment rather than replace human doctors, handling routine tasks and allowing physicians to focus on complex cases.\nQ: What do many experts believe about AI in healthcare?', options: ['It will completely replace human doctors', 'It will augment human doctors by handling routine tasks', 'It is too unreliable for medical use', 'It should be restricted to research only'], answer: [1], analysis: '文章最后说"AI will augment rather than replace human doctors, handling routine tasks"（AI将增强而非取代人类医生，处理常规任务），因此选B。', score: 14.2 },
+    { id: 33, type: 'reading', level: 'cet4', section: '仔细阅读', question: 'Passage: Sustainable fashion has emerged as a response to the environmental and social costs of the fast fashion industry. Fast fashion, characterized by rapid production of cheap clothing to match current trends, contributes to massive textile waste and poor labor conditions. Sustainable fashion brands prioritize eco-friendly materials, ethical manufacturing, and durable design. Consumers are increasingly demanding transparency in supply chains and are willing to pay more for responsibly produced clothing. However, the higher costs of sustainable production remain a barrier to widespread adoption, and greenwashing—making misleading environmental claims—continues to be a problem in the industry.\nQ: What is "greenwashing" in the fashion industry?', options: ['Using green dyes in clothing', 'Making misleading environmental claims', 'Recycling old clothes', 'Producing only green-colored garments'], answer: [1], analysis: '文章定义greenwashing为"making misleading environmental claims"（做出误导性的环保声明），因此选B。', score: 14.2 },
+    { id: 34, type: 'reading', level: 'cet4', section: '仔细阅读', question: 'Passage: The attention economy refers to the marketplace where human attention is treated as a scarce commodity. Digital platforms, particularly social media, compete for users\' attention through algorithms designed to maximize engagement. Critics argue that this model incentivizes sensational content, misinformation, and addictive design patterns. The constant barrage of notifications and infinite scrolling features are engineered to keep users hooked. Some technology ethicists advocate for "humane design" that respects users\' time and attention rather than exploiting psychological vulnerabilities for profit.\nQ: What is a criticism of the attention economy?', options: ['It makes content boring', 'It incentivizes sensational content and addictive design', 'It reduces platform profits', 'It limits user choice'], answer: [1], analysis: '文章批评注意力经济"incentivizes sensational content, misinformation, and addictive design patterns"（激励耸人听闻的内容、错误信息和成瘾设计），因此选B。', score: 14.2 },
+    { id: 35, type: 'reading', level: 'cet4', section: '仔细阅读', question: 'Passage: Space debris, or "space junk," consists of defunct satellites, spent rocket stages, and fragments from collisions orbiting Earth. With the increasing commercialization of space, the problem of orbital debris has become critical. Collisions with even small pieces of debris can damage or destroy active satellites due to their extremely high velocities. Various solutions have been proposed, including nets, harpoons, and lasers to remove debris, as well as designing satellites that burn up completely upon re-entry. International cooperation is essential to establish guidelines for responsible space operations and debris mitigation.\nQ: Why is space debris dangerous?', options: ['It blocks sunlight from reaching Earth', 'Collisions can destroy active satellites', 'It interferes with radio signals', 'It causes climate change'], answer: [1], analysis: '文章说"Collisions with even small pieces of debris can damage or destroy active satellites"（即使小碎片碰撞也能损坏或摧毁在轨卫星），因此选B。', score: 14.2 },
+
+    // 翻译部分 (5题)
+    { id: 36, type: 'translation', level: 'cet4', section: '汉译英', question: '中国将坚持创新、协调、绿色、开放、共享的新发展理念，推动经济高质量发展。\n参考译文: China will adhere to the new development philosophy of innovation, coordination, green development, openness and sharing, and promote high-quality economic development.\nQ: "新发展理念" 的正确英文表达是？', options: ['new development concept', 'new development philosophy', 'new development idea', 'new development theory'], answer: [1], analysis: '"新发展理念"标准译法为"new development philosophy"，其中philosophy比concept/idea/theory更能体现指导思想和战略层面的含义，是官方文件常用译法。', score: 15 },
+    { id: 37, type: 'translation', level: 'cet4', section: '汉译英', question: '随着科技的进步，人工智能正在改变我们的生活方式，从智能家居到自动驾驶，无处不在。\n参考译文: With the advancement of technology, artificial intelligence is transforming our way of life, from smart homes to autonomous driving, everywhere.\nQ: "自动驾驶" 的正确英文表达是？', options: ['self-driving cars', 'automatic driving', 'autonomous driving', 'auto-pilot driving'], answer: [2], analysis: '"自动驾驶"标准术语为"autonomous driving"或"self-driving"，在正式语境中autonomous driving更专业。automatic driving语义不准确，auto-pilot通常指飞机自动驾驶仪。', score: 15 },
+    { id: 38, type: 'translation', level: 'cet4', section: '汉译英', question: '中国传统文化强调和谐，认为人与自然应该和谐共生，这一理念对解决当今环境问题具有重要意义。\n参考译文: Traditional Chinese culture emphasizes harmony, believing that humans and nature should coexist harmoniously, a concept of great significance for addressing today\'s environmental issues.\nQ: "和谐共生" 的正确英文表达是？', options: ['harmonious coexistence', 'live together peacefully', 'coexist harmoniously', 'harmonious living'], answer: [2], analysis: '"和谐共生"可译为"coexist harmoniously"（副词修饰动词）或"harmonious coexistence"（名词短语）。根据句子结构"humans and nature should coexist harmoniously"，选C最符合语法结构。', score: 15 },
+    { id: 39, type: 'translation', level: 'cet4', section: '汉译英', question: '中国政府高度重视教育事业，不断加大教育投入，努力让每个孩子都能享有公平而有质量的教育。\n参考译文: The Chinese government attaches great importance to education, continuously increasing investment in education, and striving to ensure that every child has access to fair and quality education.\nQ: "高度重视" 的正确英文表达是？', options: ['highly values', 'attaches great importance to', 'pays high attention to', 'focuses highly on'], answer: [1], analysis: '"高度重视"标准译法为"attaches great importance to"或"places high importance on"，是官方文件固定搭配。highly values语法正确但不够正式；pays high attention to和focuses highly on不符合英语表达习惯。', score: 15 },
+    { id: 40, type: 'translation', level: 'cet4', section: '汉译英', question: '改革开放四十多年来，中国发生了翻天覆地的变化，人民生活水平显著提高。\n参考译文: Over the past four decades of reform and opening-up, China has undergone earth-shaking changes, and people\'s living standards have significantly improved.\nQ: "翻天覆地的变化" 的正确英文表达是？', options: ['tremendous changes', 'earth-shaking changes', 'great changes', 'remarkable changes'], answer: [1], analysis: '"翻天覆地"形象译为"earth-shaking"（震撼天地的）或"tremendous/remarkable"。earth-shaking最能传达原文的夸张修辞效果，是常见译法。', score: 15 },
+
+    // 写作/词汇语法部分 (5题)
+    { id: 41, type: 'reading', level: 'cet4', section: '词汇语法', question: '_______ the heavy rain, the outdoor concert was cancelled and all tickets were refunded.', options: ['Due to', 'Because', 'Since', 'As'], answer: [0], analysis: 'Due to是介词短语，后接名词the heavy rain。Because/Since/As是连词，后接从句，不能接名词短语。', score: 3.55 },
+    { id: 42, type: 'reading', level: 'cet4', section: '词汇语法', question: 'The professor demanded that the paper _______ before the deadline without any exception.', options: ['be submitted', 'is submitted', 'was submitted', 'would be submitted'], answer: [0], analysis: 'demand后接虚拟语气，结构为"demand that + (should) + 动词原形"。should可以省略，因此用be submitted。', score: 3.55 },
+    { id: 43, type: 'reading', level: 'cet4', section: '词汇语法', question: 'Not until midnight _______ the experiment, which turned out to be a complete success.', options: ['did they complete', 'they completed', 'had they completed', 'they had completed'], answer: [0], analysis: 'Not until置于句首时，主句要部分倒装。根据句意，实验完成发生在过去（turned out），用一般过去时did they complete。', score: 3.55 },
+    { id: 44, type: 'reading', level: 'cet4', section: '词汇语法', question: 'The new policy is designed to address the issue of income inequality, _______ has been a major concern for decades.', options: ['which', 'that', 'what', 'it'], answer: [0], analysis: '非限制性定语从句，修饰前面整个句子，用which引导。that不能引导非限制性定语从句；what引导名词性从句；it不能引导从句。', score: 3.55 },
+    { id: 45, type: 'reading', level: 'cet4', section: '词汇语法', question: '_______ is often the case with young entrepreneurs, he was full of passion but short of practical experience.', options: ['As', 'Which', 'It', 'What'], answer: [0], analysis: 'As is often the case是固定句型，意为"情况常常如此"。as引导非限制性定语从句，指代后面整个句子，在从句中作主语。', score: 3.55 },
+];
+
+// ==================== 应用状态 ====================
+const app = {
+    currentPage: 'dashboard',
+    currentExam: null,
+    currentQuestionIndex: 0,
+    examAnswers: {},
+    examMarked: {},
+    examTimer: null,
+    examTimeLeft: 0,
+    examStartTime: null,
+    practiceCategory: 'all',
+    practiceIndex: 0,
+    practiceAnswers: {},
+    showAnalysis: false,
+    wrongQuestions: [],
+    examHistory: [],
+    stats: { totalAnswered: 0, totalCorrect: 0 },
+    currentLevel: 'cet4',
+
+    init() {
+        this.loadData();
+        this.showPage('dashboard');
+        window.addEventListener('beforeunload', () => {
+            if (this.currentExam) this.saveExamProgress();
+        });
+        setInterval(() => this.saveExamProgress(), 5000);
+    },
+
+    loadData() {
+        try {
+            this.wrongQuestions = JSON.parse(localStorage.getItem('cet_wrong_questions') || '[]');
+            this.examHistory = JSON.parse(localStorage.getItem('cet_exam_history') || '[]');
+            this.stats = JSON.parse(localStorage.getItem('cet_stats') || '{"totalAnswered":0,"totalCorrect":0}');
+            this.currentLevel = localStorage.getItem('cet_current_level') || 'cet4';
+            const savedExam = localStorage.getItem('cet_exam_progress');
+            if (savedExam) {
+                const data = JSON.parse(savedExam);
+                if (data && data.startTime && (Date.now() - data.startTime < 3 * 60 * 60 * 1000)) {
+                    this.currentExam = data;
+                    this.examAnswers = data.answers || {};
+                    this.examMarked = data.marked || {};
+                    this.examStartTime = data.startTime;
+                    this.examTimeLeft = data.timeLeft || 7200;
+                } else {
+                    localStorage.removeItem('cet_exam_progress');
+                }
+            }
+        } catch (e) { console.error('Load error:', e); }
+    },
+
+    saveData() {
+        localStorage.setItem('cet_wrong_questions', JSON.stringify(this.wrongQuestions));
+        localStorage.setItem('cet_exam_history', JSON.stringify(this.examHistory));
+        localStorage.setItem('cet_stats', JSON.stringify(this.stats));
+        localStorage.setItem('cet_current_level', this.currentLevel);
+    },
+
+    saveExamProgress() {
+        if (this.currentExam) {
+            localStorage.setItem('cet_exam_progress', JSON.stringify({
+                answers: this.examAnswers,
+                marked: this.examMarked,
+                timeLeft: this.examTimeLeft,
+                startTime: this.examStartTime,
+                currentIndex: this.currentQuestionIndex
+            }));
+        }
+    },
+
+    showPage(page, params = {}) {
+        this.currentPage = page;
+        const nav = document.getElementById('navTimer');
+        const main = document.getElementById('mainContent');
+        
+        if (page === 'exam') {
+            nav.classList.remove('hidden');
+            nav.classList.add('flex');
+        } else {
+            nav.classList.add('hidden');
+            nav.classList.remove('flex');
+        }
+
+        switch(page) {
+            case 'dashboard': this.renderDashboard(); break;
+            case 'exam': this.renderExam(); break;
+            case 'practice': this.renderPractice(params.category || 'all'); break;
+            case 'wrongbook': this.renderWrongBook(); break;
+            case 'history': this.renderHistory(); break;
+            case 'result': this.renderResult(params.result); break;
+        }
+    },
+
+    switchLevel(level) {
+        if (this.currentLevel === level) return;
+        this.currentLevel = level;
+        this.saveData();
+        this.showPage('dashboard');
+        this.showToast(level === 'cet4' ? '已切换至四级' : '已切换至六级');
+    },
+
+    showToast(text) {
+        const toast = document.getElementById('toast');
+        document.getElementById('toastText').textContent = text;
+        toast.classList.remove('hidden');
+        setTimeout(() => toast.classList.add('hidden'), 2000);
+    },
+
+    showModal(html) {
+        const modal = document.getElementById('modal');
+        document.getElementById('modalContent').innerHTML = html;
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    },
+
+    closeModal() {
+        const modal = document.getElementById('modal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    },
+
+    // ==================== 仪表盘 ====================
+    renderDashboard() {
+        const main = document.getElementById('mainContent');
+        const levelHistory = this.examHistory.filter(h => h.level === this.currentLevel);
+        const totalExams = levelHistory.length;
+        const avgScore = totalExams > 0 ? Math.round(levelHistory.reduce((a,b) => a + b.totalScore, 0) / totalExams) : 0;
+        const maxScore = totalExams > 0 ? Math.max(...levelHistory.map(h => h.totalScore)) : 0;
+        const accuracy = this.stats.totalAnswered > 0 ? Math.round((this.stats.totalCorrect / this.stats.totalAnswered) * 100) : 0;
+        const levelWrongCount = this.wrongQuestions.filter(w => w.level === this.currentLevel).length;
+
+        main.innerHTML = `
+            <div class="fade-in">
+                <div class="mb-8">
+                    <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">欢迎回来</h1>
+                    <p class="text-gray-600">大学英语${this.currentLevel === 'cet4' ? '四级' : '六级'}全真模考系统 · 随时随地，全真演练</p>
+                </div>
+
+                <!-- 统计卡片 -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <div class="bg-white rounded-2xl p-5 exam-shadow stat-card">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                            </div>
+                            <span class="text-xs text-gray-500">累计模考</span>
+                        </div>
+                        <p class="text-3xl font-bold text-gray-900">${totalExams}</p>
+                        <p class="text-xs text-gray-500 mt-1">次</p>
+                    </div>
+                    <div class="bg-white rounded-2xl p-5 exam-shadow stat-card">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
+                                <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            </div>
+                            <span class="text-xs text-gray-500">最高得分</span>
+                        </div>
+                        <p class="text-3xl font-bold text-gray-900">${maxScore}</p>
+                        <p class="text-xs text-gray-500 mt-1">分</p>
+                    </div>
+                    <div class="bg-white rounded-2xl p-5 exam-shadow stat-card">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center">
+                                <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            </div>
+                            <span class="text-xs text-gray-500">错题数量</span>
+                        </div>
+                        <p class="text-3xl font-bold text-gray-900">${levelWrongCount}</p>
+                        <p class="text-xs text-gray-500 mt-1">道</p>
+                    </div>
+                    <div class="bg-white rounded-2xl p-5 exam-shadow stat-card">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+                                <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                            </div>
+                            <span class="text-xs text-gray-500">答题正确率</span>
+                        </div>
+                        <p class="text-3xl font-bold text-gray-900">${accuracy}%</p>
+                        <p class="text-xs text-gray-500 mt-1">${this.stats.totalCorrect}/${this.stats.totalAnswered} 题</p>
+                    </div>
+                </div>
+
+                <!-- 功能入口 -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <button onclick="app.startPractice()" class="bg-white rounded-2xl p-6 exam-shadow text-left hover:shadow-lg transition group">
+                        <div class="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                        </div>
+                        <h3 class="font-bold text-gray-900 mb-1">专项刷题</h3>
+                        <p class="text-sm text-gray-500">听力 / 阅读 / 翻译分类练习</p>
+                    </button>
+                    <button onclick="app.confirmStartExam()" class="bg-white rounded-2xl p-6 exam-shadow text-left hover:shadow-lg transition group">
+                        <div class="w-12 h-12 bg-red-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </div>
+                        <h3 class="font-bold text-gray-900 mb-1">全真模拟考试</h3>
+                        <p class="text-sm text-gray-500">120分钟全真计时模考</p>
+                    </button>
+                    <button onclick="app.showPage('wrongbook')" class="bg-white rounded-2xl p-6 exam-shadow text-left hover:shadow-lg transition group">
+                        <div class="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>
+                        </div>
+                        <h3 class="font-bold text-gray-900 mb-1">错题本</h3>
+                        <p class="text-sm text-gray-500">${levelWrongCount} 道错题待复习</p>
+                    </button>
+                    <button onclick="app.showPage('history')" class="bg-white rounded-2xl p-6 exam-shadow text-left hover:shadow-lg transition group">
+                        <div class="w-12 h-12 bg-purple-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                        </div>
+                        <h3 class="font-bold text-gray-900 mb-1">历史成绩</h3>
+                        <p class="text-sm text-gray-500">查看历次分数变化</p>
+                    </button>
+                </div>
+
+                <!-- 最近记录 -->
+                <div class="bg-white rounded-2xl exam-shadow overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                        <h3 class="font-bold text-gray-900">最近模考记录</h3>
+                        ${totalExams > 0 ? `<button onclick="app.showPage('history')" class="text-blue-600 text-sm hover:underline">查看全部</button>` : ''}
+                    </div>
+                    <div class="divide-y divide-gray-50">
+                        ${totalExams === 0 ? `
+                            <div class="px-6 py-12 text-center text-gray-500">
+                                <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                <p>暂无模考记录，开始你的第一次全真模拟吧</p>
+                            </div>
+                        ` : levelHistory.slice(-5).reverse().map(h => `
+                            <div class="px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition">
+                                <div>
+                                    <p class="font-medium text-gray-900">${h.date}</p>
+                                    <p class="text-sm text-gray-500">用时 ${h.duration}</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-2xl font-bold ${h.totalScore >= 425 ? 'text-green-600' : 'text-orange-600'}">${h.totalScore}</p>
+                                    <p class="text-xs text-gray-500">分</p>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+
+                ${this.currentExam ? `
+                    <div class="mt-6 bg-gradient-to-r from-red-500 to-red-600 rounded-2xl p-6 text-white flex items-center justify-between">
+                        <div>
+                            <h3 class="font-bold text-lg mb-1">有未完成的考试</h3>
+                            <p class="text-red-100 text-sm">上次考试还未交卷，是否继续？</p>
+                        </div>
+                        <button onclick="app.resumeExam()" class="bg-white text-red-600 px-6 py-2.5 rounded-xl font-bold hover:bg-red-50 transition">继续考试</button>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    },
+
+    // ==================== 全真模拟考试 ====================
+    confirmStartExam() {
+        if (this.currentExam) {
+            this.showModal(`
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">发现未完成的考试</h3>
+                    <p class="text-gray-600 mb-6">继续之前的考试，或重新开始？</p>
+                    <div class="flex space-x-3">
+                        <button onclick="app.closeModal(); app.resumeExam()" class="flex-1 bg-blue-600 text-white py-2.5 rounded-xl font-medium hover:bg-blue-700 transition">继续考试</button>
+                        <button onclick="app.startNewExam()" class="flex-1 bg-gray-200 text-gray-700 py-2.5 rounded-xl font-medium hover:bg-gray-300 transition">重新开始</button>
+                    </div>
+                </div>
+            `);
+        } else {
+            this.startNewExam();
+        }
+    },
+
+    startNewExam() {
+        this.closeModal();
+        this.examAnswers = {};
+        this.examMarked = {};
+        this.examStartTime = Date.now();
+        this.examTimeLeft = 120 * 60; // 120分钟
+        this.currentExam = true;
+        this.currentQuestionIndex = 0;
+        this.saveExamProgress();
+        this.showPage('exam');
+        this.startTimer();
+        this.showToast('考试开始，请认真作答');
+    },
+
+    resumeExam() {
+        this.showPage('exam');
+        this.startTimer();
+        this.showToast('已恢复考试进度');
+    },
+
+    startTimer() {
+        if (this.examTimer) clearInterval(this.examTimer);
+        this.updateTimerDisplay();
+        this.examTimer = setInterval(() => {
+            this.examTimeLeft--;
+            this.updateTimerDisplay();
+            if (this.examTimeLeft <= 0) {
+                this.submitExam(true);
+            }
+        }, 1000);
+    },
+
+    updateTimerDisplay() {
+        const h = Math.floor(this.examTimeLeft / 3600).toString().padStart(2, '0');
+        const m = Math.floor((this.examTimeLeft % 3600) / 60).toString().padStart(2, '0');
+        const s = (this.examTimeLeft % 60).toString().padStart(2, '0');
+        const display = document.getElementById('timerDisplay');
+        if (display) {
+            display.textContent = `${h}:${m}:${s}`;
+            if (this.examTimeLeft < 300) display.classList.add('timer-warning');
+            else display.classList.remove('timer-warning');
+        }
+    },
+
+    getExamQuestions() {
+        return questionBank.filter(q => ['listening', 'reading', 'translation'].includes(q.type) && q.level === this.currentLevel);
+    },
+
+    renderExam() {
+        const main = document.getElementById('mainContent');
+        const questions = this.getExamQuestions();
+        const q = questions[this.currentQuestionIndex];
+        if (!q) return;
+
+        const answeredCount = Object.keys(this.examAnswers).length;
+        const markedCount = Object.keys(this.examMarked).filter(k => this.examMarked[k]).length;
+
+        main.innerHTML = `
+            <div class="flex flex-col lg:flex-row gap-6">
+                <!-- 左侧题目区 -->
+                <div class="flex-1">
+                    <div class="bg-white rounded-2xl exam-shadow overflow-hidden">
+                        <!-- 题目头部 -->
+                        <div class="bg-gray-50 px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
+                            <div class="flex items-center space-x-3">
+                                <span class="text-lg font-bold text-gray-900">第 ${this.currentQuestionIndex + 1} 题</span>
+                                <span class="question-type-badge ${q.type === 'listening' ? 'listening-badge' : q.type === 'reading' ? 'reading-badge' : 'translation-badge'}">${q.type === 'listening' ? '听力' : q.type === 'reading' ? '阅读' : '翻译'}</span>
+                                <span class="text-sm text-gray-500">${q.section}</span>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-sm text-gray-500">分值: ${q.score} 分</span>
+                                <button onclick="app.toggleMark(${q.id})" class="flex items-center space-x-1 px-3 py-1.5 rounded-lg text-sm font-medium transition ${this.examMarked[q.id] ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}">
+                                    <svg class="w-4 h-4" fill="${this.examMarked[q.id] ? 'currentColor' : 'none'}" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path></svg>
+                                    <span>${this.examMarked[q.id] ? '已标记' : '标记'}</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 题目内容 -->
+                        <div class="p-6">
+                            <div class="exam-content text-gray-800 mb-6 passage-text">${q.question.replace(/\n/g, '<br>')}</div>
+                            
+                            <!-- 选项 -->
+                            <div class="space-y-3">
+                                ${q.options.map((opt, idx) => {
+                                    const isSelected = this.examAnswers[q.id]?.includes(idx);
+                                    return `
+                                        <div onclick="app.selectOption(${q.id}, ${idx})" class="flex items-start p-4 rounded-xl border-2 cursor-pointer transition option-hover ${isSelected ? 'option-selected' : 'border-gray-200 option-default'}">
+                                            <span class="option-label">${String.fromCharCode(65 + idx)}</span>
+                                            <span class="flex-1 text-gray-700">${opt}</span>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+
+                        <!-- 底部操作 -->
+                        <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
+                            <button onclick="app.prevQuestion()" ${this.currentQuestionIndex === 0 ? 'disabled' : ''} class="flex items-center space-x-1 px-4 py-2 rounded-xl font-medium transition ${this.currentQuestionIndex === 0 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'}">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                                <span>上一题</span>
+                            </button>
+                            <div class="flex items-center space-x-3">
+                                <button onclick="app.confirmSubmitExam()" class="bg-red-600 text-white px-6 py-2 rounded-xl font-medium hover:bg-red-700 transition">交卷</button>
+                                <button onclick="app.nextQuestion()" class="flex items-center space-x-1 px-4 py-2 rounded-xl font-medium transition ${this.currentQuestionIndex === questions.length - 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}" ${this.currentQuestionIndex === questions.length - 1 ? 'disabled' : ''}>
+                                    <span>下一题</span>
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右侧导航面板 -->
+                <div class="lg:w-80">
+                    <div class="bg-white rounded-2xl exam-shadow p-5 sticky top-20">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-bold text-gray-900">答题卡</h3>
+                            <span class="text-sm text-gray-500">${answeredCount}/${questions.length} 已答</span>
+                        </div>
+                        
+                        <!-- 图例 -->
+                        <div class="flex items-center space-x-4 mb-4 text-xs text-gray-600">
+                            <div class="flex items-center space-x-1"><div class="w-3 h-3 bg-blue-600 rounded"></div><span>已答</span></div>
+                            <div class="flex items-center space-x-1"><div class="w-3 h-3 bg-gray-200 rounded"></div><span>未答</span></div>
+                            <div class="flex items-center space-x-1"><div class="w-3 h-3 bg-yellow-500 rounded"></div><span>标记</span></div>
+                        </div>
+
+                        <!-- 题号网格 -->
+                        <div class="grid grid-cols-5 sm:grid-cols-6 lg:grid-cols-5 gap-2 max-h-96 overflow-y-auto custom-scrollbar">
+                            ${questions.map((question, idx) => {
+                                const isAnswered = this.examAnswers[question.id] !== undefined;
+                                const isMarked = this.examMarked[question.id];
+                                const isCurrent = idx === this.currentQuestionIndex;
+                                let cls = 'bg-gray-100 text-gray-600 hover:bg-gray-200';
+                                if (isMarked) cls = 'nav-marked';
+                                else if (isAnswered) cls = 'nav-answered';
+                                if (isCurrent) cls += ' nav-current';
+                                return `<button onclick="app.goToQuestion(${idx})" class="w-full aspect-square rounded-lg text-sm font-medium transition ${cls}">${idx + 1}</button>`;
+                            }).join('')}
+                        </div>
+
+                        <div class="mt-4 pt-4 border-t border-gray-100">
+                            <div class="flex justify-between text-sm text-gray-600 mb-2">
+                                <span>已答: ${answeredCount} 题</span>
+                                <span>标记: ${markedCount} 题</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-blue-600 h-2 rounded-full transition-all" style="width: ${(answeredCount / questions.length * 100).toFixed(0)}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    selectOption(qid, idx) {
+        const q = questionBank.find(x => x.id === qid);
+        if (!q) return;
+        if (!this.examAnswers[qid]) this.examAnswers[qid] = [];
+        
+        if (q.answer.length > 1) {
+            // 多选
+            const pos = this.examAnswers[qid].indexOf(idx);
+            if (pos > -1) this.examAnswers[qid].splice(pos, 1);
+            else this.examAnswers[qid].push(idx);
+        } else {
+            // 单选
+            this.examAnswers[qid] = [idx];
+        }
+        this.saveExamProgress();
+        this.renderExam();
+    },
+
+    toggleMark(qid) {
+        this.examMarked[qid] = !this.examMarked[qid];
+        if (!this.examMarked[qid]) delete this.examMarked[qid];
+        this.saveExamProgress();
+        this.renderExam();
+    },
+
+    prevQuestion() {
+        if (this.currentQuestionIndex > 0) {
+            this.currentQuestionIndex--;
+            this.renderExam();
+        }
+    },
+
+    nextQuestion() {
+        const questions = this.getExamQuestions();
+        if (this.currentQuestionIndex < questions.length - 1) {
+            this.currentQuestionIndex++;
+            this.renderExam();
+        }
+    },
+
+    goToQuestion(idx) {
+        this.currentQuestionIndex = idx;
+        this.renderExam();
+    },
+
+    confirmSubmitExam() {
+        const questions = this.getExamQuestions();
+        const unanswered = questions.filter(q => !this.examAnswers[q.id]).length;
+        
+        this.showModal(`
+            <div class="text-center">
+                <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>
+                </div>
+                <h3 class="text-lg font-bold text-gray-900 mb-2">确认交卷？</h3>
+                <p class="text-gray-600 mb-2">还有 <span class="font-bold text-red-600">${unanswered}</span> 道题未作答</p>
+                <p class="text-sm text-gray-500 mb-6">交卷后将无法修改答案</p>
+                <div class="flex space-x-3">
+                    <button onclick="app.closeModal()" class="flex-1 bg-gray-200 text-gray-700 py-2.5 rounded-xl font-medium hover:bg-gray-300 transition">继续答题</button>
+                    <button onclick="app.submitExam()" class="flex-1 bg-red-600 text-white py-2.5 rounded-xl font-medium hover:bg-red-700 transition">确认交卷</button>
+                </div>
+            </div>
+        `);
+    },
+
+    submitExam(isTimeout = false) {
+        if (this.examTimer) clearInterval(this.examTimer);
+        this.examTimer = null;
+        
+        const questions = this.getExamQuestions();
+        let totalScore = 0;
+        let listeningScore = 0, readingScore = 0, translationScore = 0;
+        let correctCount = 0;
+        let listeningTotal = 0, readingTotal = 0, translationTotal = 0;
+
+        questions.forEach(q => {
+            const userAns = this.examAnswers[q.id] || [];
+            const isCorrect = JSON.stringify([...userAns].sort()) === JSON.stringify([...q.answer].sort());
+            
+            if (q.type === 'listening') listeningTotal += q.score;
+            else if (q.type === 'reading') readingTotal += q.score;
+            else translationTotal += q.score;
+
+            if (isCorrect) {
+                correctCount++;
+                totalScore += q.score;
+                if (q.type === 'listening') listeningScore += q.score;
+                else if (q.type === 'reading') readingScore += q.score;
+                else translationScore += q.score;
+                this.stats.totalCorrect++;
+            }
+            this.stats.totalAnswered++;
+            
+            // 错题入错题本
+            if (!isCorrect) {
+                const exists = this.wrongQuestions.find(w => w.id === q.id);
+                if (!exists) {
+                    this.wrongQuestions.push({
+                        id: q.id,
+                        type: q.type,
+                        level: q.level,
+                        section: q.section,
+                        question: q.question,
+                        options: q.options,
+                        answer: q.answer,
+                        analysis: q.analysis,
+                        userAnswer: userAns,
+                        timestamp: Date.now(),
+                        source: 'exam'
+                    });
+                }
+            }
+        });
+
+        const duration = isTimeout ? '120分钟(强制交卷)' : this.formatDuration(120 * 60 - this.examTimeLeft);
+        const result = {
+            date: new Date().toLocaleString('zh-CN'),
+            level: this.currentLevel,
+            totalScore: Math.round(totalScore * 10) / 10,
+            listeningScore: Math.round(listeningScore * 10) / 10,
+            readingScore: Math.round(readingScore * 10) / 10,
+            translationScore: Math.round(translationScore * 10) / 10,
+            listeningTotal,
+            readingTotal,
+            translationTotal,
+            correctCount,
+            totalCount: questions.length,
+            accuracy: Math.round((correctCount / questions.length) * 100),
+            duration,
+            isTimeout
+        };
+
+        this.examHistory.push(result);
+        this.saveData();
+        
+        this.currentExam = null;
+        this.examAnswers = {};
+        this.examMarked = {};
+        localStorage.removeItem('cet_exam_progress');
+        
+        this.closeModal();
+        this.showPage('result', { result });
+        this.showToast(isTimeout ? '时间到，已自动交卷' : '交卷成功');
+    },
+
+    formatDuration(seconds) {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = seconds % 60;
+        return h > 0 ? `${h}小时${m}分` : `${m}分${s}秒`;
+    },
+
+    // ==================== 成绩报告 ====================
+    renderResult(result) {
+        if (!result) { this.showPage('dashboard'); return; }
+        const main = document.getElementById('mainContent');
+        const isPass = result.totalScore >= 425;
+
+        main.innerHTML = `
+            <div class="max-w-2xl mx-auto fade-in">
+                <div class="bg-white rounded-2xl exam-shadow overflow-hidden">
+                    <div class="bg-gradient-to-r ${isPass ? 'from-green-500 to-green-600' : 'from-orange-500 to-red-500'} p-8 text-center text-white">
+                        <p class="text-sm opacity-90 mb-2">${result.date}</p>
+                        <h2 class="text-2xl font-bold mb-4">${isPass ? '恭喜，成绩合格！' : '继续加油，再接再厉！'}</h2>
+                        <div class="text-6xl font-black mb-2">${result.totalScore}</div>
+                        <p class="opacity-90">总分 / 710</p>
+                    </div>
+                    
+                    <div class="p-6">
+                        <!-- 单项分数 -->
+                        <div class="grid grid-cols-3 gap-4 mb-6">
+                            <div class="bg-blue-50 rounded-xl p-4 text-center">
+                                <p class="text-sm text-blue-600 mb-1">听力</p>
+                                <p class="text-2xl font-bold text-blue-700">${result.listeningScore}</p>
+                                <p class="text-xs text-blue-400 mt-1">满分 ${result.listeningTotal}</p>
+                            </div>
+                            <div class="bg-green-50 rounded-xl p-4 text-center">
+                                <p class="text-sm text-green-600 mb-1">阅读</p>
+                                <p class="text-2xl font-bold text-green-700">${result.readingScore}</p>
+                                <p class="text-xs text-green-400 mt-1">满分 ${result.readingTotal}</p>
+                            </div>
+                            <div class="bg-yellow-50 rounded-xl p-4 text-center">
+                                <p class="text-sm text-yellow-600 mb-1">翻译</p>
+                                <p class="text-2xl font-bold text-yellow-700">${result.translationScore}</p>
+                                <p class="text-xs text-yellow-400 mt-1">满分 ${result.translationTotal}</p>
+                            </div>
+                        </div>
+
+                        <!-- 统计信息 -->
+                        <div class="bg-gray-50 rounded-xl p-5 mb-6">
+                            <div class="grid grid-cols-2 gap-4 text-center">
+                                <div>
+                                    <p class="text-sm text-gray-500">正确率</p>
+                                    <p class="text-xl font-bold text-gray-900">${result.accuracy}%</p>
+                                    <p class="text-xs text-gray-400">${result.correctCount}/${result.totalCount} 题</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-500">用时</p>
+                                    <p class="text-xl font-bold text-gray-900">${result.duration}</p>
+                                    <p class="text-xs text-gray-400">${result.isTimeout ? '已强制交卷' : '正常交卷'}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 操作按钮 -->
+                        <div class="flex space-x-3">
+                            <button onclick="app.showPage('dashboard')" class="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-200 transition">返回首页</button>
+                            <button onclick="app.showPage('wrongbook')" class="flex-1 bg-blue-600 text-white py-3 rounded-xl font-medium hover:bg-blue-700 transition">查看错题</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    // ==================== 专项刷题 ====================
+    startPractice() {
+        this.practiceCategory = 'all';
+        this.practiceIndex = 0;
+        this.practiceAnswers = {};
+        this.showAnalysis = false;
+        this.showPage('practice');
+    },
+
+    getPracticeQuestions() {
+        let qs = questionBank.filter(q => q.level === this.currentLevel);
+        if (this.practiceCategory === 'all') return qs;
+        return qs.filter(q => q.type === this.practiceCategory);
+    },
+
+    renderPractice(category) {
+        this.practiceCategory = category;
+        const main = document.getElementById('mainContent');
+        const questions = this.getPracticeQuestions();
+        
+        if (this.practiceIndex >= questions.length) {
+            this.renderPracticeSummary();
+            return;
+        }
+
+        const q = questions[this.practiceIndex];
+        const userAns = this.practiceAnswers[q.id] || [];
+        const hasAnswered = userAns.length > 0;
+        const isCorrect = hasAnswered && JSON.stringify([...userAns].sort()) === JSON.stringify([...q.answer].sort());
+
+        main.innerHTML = `
+            <div class="max-w-3xl mx-auto fade-in">
+                <!-- 分类标签 -->
+                <div class="flex flex-wrap gap-2 mb-6">
+                    ${['all', 'listening', 'reading', 'translation'].map(c => `
+                        <button onclick="app.setPracticeCategory('${c}')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${this.practiceCategory === c ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}">
+                            ${c === 'all' ? '全部' : c === 'listening' ? '听力' : c === 'reading' ? '阅读' : '翻译'}
+                            <span class="ml-1 text-xs opacity-75">(${c === 'all' ? questionBank.filter(x=>x.level===this.currentLevel).length : questionBank.filter(x=>x.type===c && x.level===this.currentLevel).length})</span>
+                        </button>
+                    `).join('')}
+                </div>
+
+                <div class="bg-white rounded-2xl exam-shadow overflow-hidden">
+                    <div class="bg-gray-50 px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
+                        <div class="flex items-center space-x-3">
+                            <span class="text-lg font-bold text-gray-900">第 ${this.practiceIndex + 1} / ${questions.length} 题</span>
+                            <span class="question-type-badge ${q.type === 'listening' ? 'listening-badge' : q.type === 'reading' ? 'reading-badge' : 'translation-badge'}">${q.type === 'listening' ? '听力' : q.type === 'reading' ? '阅读' : '翻译'}</span>
+                        </div>
+                        <span class="text-sm text-gray-500">分值: ${q.score} 分</span>
+                    </div>
+
+                    <div class="p-6">
+                        <div class="exam-content text-gray-800 mb-6 passage-text">${q.question.replace(/\n/g, '<br>')}</div>
+                        
+                        <div class="space-y-3 mb-6">
+                            ${q.options.map((opt, idx) => {
+                                const isSelected = userAns.includes(idx);
+                                let cls = 'border-gray-200 option-default';
+                                let labelCls = '';
+                                if (this.showAnalysis) {
+                                    if (q.answer.includes(idx)) { cls = 'option-correct'; labelCls = 'correct-tag'; }
+                                    else if (isSelected) { cls = 'option-wrong'; labelCls = 'wrong-tag'; }
+                                } else if (isSelected) {
+                                    cls = 'option-selected';
+                                }
+                                return `
+                                    <div onclick="app.selectPracticeOption(${q.id}, ${idx})" class="flex items-start p-4 rounded-xl border-2 cursor-pointer transition option-hover ${cls}">
+                                        <span class="option-label ${labelCls}">${String.fromCharCode(65 + idx)}</span>
+                                        <span class="flex-1 text-gray-700">${opt}</span>
+                                        ${this.showAnalysis && q.answer.includes(idx) ? '<svg class="w-5 h-5 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>' : ''}
+                                        ${this.showAnalysis && isSelected && !q.answer.includes(idx) ? '<svg class="w-5 h-5 text-red-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>' : ''}
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+
+                        ${this.showAnalysis ? `
+                            <div class="bg-blue-50 rounded-xl p-5 mb-6 border border-blue-100">
+                                <div class="flex items-center space-x-2 mb-3">
+                                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    <span class="font-bold text-blue-900">答案解析</span>
+                                </div>
+                                <p class="text-sm text-blue-800 mb-2">正确答案: <span class="font-bold">${q.answer.map(i => String.fromCharCode(65+i)).join(', ')}</span></p>
+                                <p class="text-blue-800 leading-relaxed">${q.analysis}</p>
+                            </div>
+                        ` : ''}
+
+                        <div class="flex items-center justify-between">
+                            <button onclick="app.prevPractice()" ${this.practiceIndex === 0 ? 'disabled' : ''} class="flex items-center space-x-1 px-4 py-2 rounded-xl font-medium transition ${this.practiceIndex === 0 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'}">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                                <span>上一题</span>
+                            </button>
+                            <div class="flex items-center space-x-3">
+                                ${!this.showAnalysis && hasAnswered ? `
+                                    <button onclick="app.checkPracticeAnswer()" class="bg-green-600 text-white px-6 py-2 rounded-xl font-medium hover:bg-green-700 transition">查看解析</button>
+                                ` : ''}
+                                <button onclick="app.nextPractice()" class="flex items-center space-x-1 px-4 py-2 rounded-xl font-medium transition bg-blue-600 text-white hover:bg-blue-700">
+                                    <span>${this.practiceIndex === questions.length - 1 ? '完成练习' : '下一题'}</span>
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    setPracticeCategory(c) {
+        this.practiceCategory = c;
+        this.practiceIndex = 0;
+        this.practiceAnswers = {};
+        this.showAnalysis = false;
+        this.renderPractice(c);
+    },
+
+    selectPracticeOption(qid, idx) {
+        if (this.showAnalysis) return;
+        const q = questionBank.find(x => x.id === qid);
+        if (!q) return;
+        if (!this.practiceAnswers[qid]) this.practiceAnswers[qid] = [];
+        
+        if (q.answer.length > 1) {
+            const pos = this.practiceAnswers[qid].indexOf(idx);
+            if (pos > -1) this.practiceAnswers[qid].splice(pos, 1);
+            else this.practiceAnswers[qid].push(idx);
+        } else {
+            this.practiceAnswers[qid] = [idx];
+        }
+        this.renderPractice(this.practiceCategory);
+    },
+
+    checkPracticeAnswer() {
+        this.showAnalysis = true;
+        const q = this.getPracticeQuestions()[this.practiceIndex];
+        const userAns = this.practiceAnswers[q.id] || [];
+        const isCorrect = JSON.stringify([...userAns].sort()) === JSON.stringify([...q.answer].sort());
+        
+        this.stats.totalAnswered++;
+        if (isCorrect) this.stats.totalCorrect++;
+        else {
+            const exists = this.wrongQuestions.find(w => w.id === q.id);
+            if (!exists) {
+                this.wrongQuestions.push({
+                    id: q.id, type: q.type, level: q.level, section: q.section, question: q.question,
+                    options: q.options, answer: q.answer, analysis: q.analysis,
+                    userAnswer: userAns, timestamp: Date.now(), source: 'practice'
+                });
+            }
+        }
+        this.saveData();
+        this.renderPractice(this.practiceCategory);
+    },
+
+    prevPractice() {
+        if (this.practiceIndex > 0) {
+            this.practiceIndex--;
+            this.showAnalysis = false;
+            this.renderPractice(this.practiceCategory);
+        }
+    },
+
+    nextPractice() {
+        this.practiceIndex++;
+        this.showAnalysis = false;
+        this.renderPractice(this.practiceCategory);
+    },
+
+    renderPracticeSummary() {
+        const main = document.getElementById('mainContent');
+        const questions = this.getPracticeQuestions();
+        let correct = 0;
+        questions.forEach(q => {
+            const userAns = this.practiceAnswers[q.id] || [];
+            if (JSON.stringify([...userAns].sort()) === JSON.stringify([...q.answer].sort())) correct++;
+        });
+
+        main.innerHTML = `
+            <div class="max-w-md mx-auto fade-in">
+                <div class="bg-white rounded-2xl exam-shadow p-8 text-center">
+                    <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </div>
+                    <h2 class="text-2xl font-bold text-gray-900 mb-2">练习完成</h2>
+                    <p class="text-gray-600 mb-6">本轮共 ${questions.length} 题，答对 ${correct} 题</p>
+                    <div class="bg-gray-50 rounded-xl p-4 mb-6">
+                        <div class="text-3xl font-bold text-blue-600">${Math.round(correct / questions.length * 100)}%</div>
+                        <div class="text-sm text-gray-500">正确率</div>
+                    </div>
+                    <div class="flex space-x-3">
+                        <button onclick="app.startPractice()" class="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-200 transition">再练一次</button>
+                        <button onclick="app.showPage('dashboard')" class="flex-1 bg-blue-600 text-white py-3 rounded-xl font-medium hover:bg-blue-700 transition">返回首页</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    // ==================== 错题本 ====================
+    renderWrongBook() {
+        const main = document.getElementById('mainContent');
+        const wrongs = this.wrongQuestions.filter(w => w.level === this.currentLevel);
+
+        main.innerHTML = `
+            <div class="fade-in">
+                <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-900">错题本</h2>
+                        <p class="text-gray-500 text-sm mt-1">大学英语${this.currentLevel === 'cet4' ? '四级' : '六级'} · 共 ${wrongs.length} 道错题</p>
+                    </div>
+                    ${wrongs.length > 0 ? `
+                        <button onclick="app.confirmClearWrong()" class="bg-red-100 text-red-600 px-4 py-2 rounded-xl text-sm font-medium hover:bg-red-200 transition">一键清空</button>
+                    ` : ''}
+                </div>
+
+                ${wrongs.length === 0 ? `
+                    <div class="bg-white rounded-2xl exam-shadow p-12 text-center">
+                        <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">暂无错题</h3>
+                        <p class="text-gray-500 mb-6">刷题或模考中答错的题目会自动存入错题本</p>
+                        <button onclick="app.startPractice()" class="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-medium hover:bg-blue-700 transition">去刷题</button>
+                    </div>
+                ` : `
+                    <div class="space-y-4">
+                        ${wrongs.map((w, idx) => `
+                            <div class="bg-white rounded-2xl exam-shadow p-5 slide-up" style="animation-delay: ${idx * 0.05}s">
+                                <div class="flex items-start justify-between mb-3">
+                                    <div class="flex items-center space-x-2 flex-wrap gap-2">
+                                        <span class="question-type-badge ${w.type === 'listening' ? 'listening-badge' : w.type === 'reading' ? 'reading-badge' : 'translation-badge'}">${w.type === 'listening' ? '听力' : w.type === 'reading' ? '阅读' : '翻译'}</span>
+                                        <span class="text-xs text-gray-400">${w.source === 'exam' ? '模考' : '刷题'} · ${new Date(w.timestamp).toLocaleDateString()}</span>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <button onclick="app.redoWrong(${w.id})" class="text-blue-600 text-sm font-medium hover:underline">重做</button>
+                                        <button onclick="app.removeWrong(${w.id})" class="text-red-500 text-sm font-medium hover:underline">移除</button>
+                                    </div>
+                                </div>
+                                <div class="text-gray-800 text-sm mb-3 passage-text">${w.question.substring(0, 200).replace(/\n/g, '<br>')}${w.question.length > 200 ? '...' : ''}</div>
+                                <div class="flex flex-wrap gap-2 text-sm">
+                                    <span class="px-3 py-1 bg-red-50 text-red-600 rounded-lg">你的答案: ${w.userAnswer.length ? w.userAnswer.map(i => String.fromCharCode(65+i)).join(', ') : '未作答'}</span>
+                                    <span class="px-3 py-1 bg-green-50 text-green-600 rounded-lg">正确答案: ${w.answer.map(i => String.fromCharCode(65+i)).join(', ')}</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `}
+            </div>
+        `;
+    },
+
+    redoWrong(id) {
+        const w = this.wrongQuestions.find(x => x.id === id);
+        if (!w) return;
+        
+        this.showModal(`
+            <div class="text-left">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-bold text-gray-900">错题重做</h3>
+                    <button onclick="app.closeModal()" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                </div>
+                <div class="text-gray-800 text-sm mb-4 passage-text max-h-48 overflow-y-auto custom-scrollbar">${w.question.replace(/\n/g, '<br>')}</div>
+                <div class="space-y-2 mb-4">
+                    ${w.options.map((opt, idx) => `
+                        <label class="flex items-start p-3 rounded-lg border-2 border-gray-200 cursor-pointer hover:border-blue-400 transition">
+                            <input type="${w.answer.length > 1 ? 'checkbox' : 'radio'}" name="redo_${id}" value="${idx}" class="mt-1 mr-2">
+                            <span class="text-sm text-gray-700">${String.fromCharCode(65+idx)}. ${opt}</span>
+                        </label>
+                    `).join('')}
+                </div>
+                <div id="redoResult" class="hidden mb-4"></div>
+                <div class="flex space-x-3">
+                    <button onclick="app.closeModal()" class="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-medium hover:bg-gray-200 transition">取消</button>
+                    <button onclick="app.checkRedo(${id})" class="flex-1 bg-blue-600 text-white py-2.5 rounded-xl font-medium hover:bg-blue-700 transition">提交</button>
+                </div>
+            </div>
+        `);
+    },
+
+    checkRedo(id) {
+        const w = this.wrongQuestions.find(x => x.id === id);
+        if (!w) return;
+        const inputs = document.querySelectorAll(`input[name="redo_${id}"]:checked`);
+        const userAns = Array.from(inputs).map(i => parseInt(i.value));
+        const isCorrect = JSON.stringify([...userAns].sort()) === JSON.stringify([...w.answer].sort());
+        
+        const resultDiv = document.getElementById('redoResult');
+        resultDiv.classList.remove('hidden');
+        resultDiv.innerHTML = `
+            <div class="${isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'} border rounded-xl p-4">
+                <p class="font-bold ${isCorrect ? 'text-green-700' : 'text-red-700'} mb-2">${isCorrect ? '回答正确！' : '回答错误'}</p>
+                <p class="text-sm text-gray-700 mb-2">正确答案: ${w.answer.map(i => String.fromCharCode(65+i)).join(', ')}</p>
+                <p class="text-sm text-gray-600">${w.analysis}</p>
+            </div>
+            ${isCorrect ? `<button onclick="app.removeWrong(${id}); app.closeModal();" class="w-full mt-3 bg-green-600 text-white py-2 rounded-xl font-medium hover:bg-green-700 transition">移出错题本</button>` : ''}
+        `;
+        
+        if (isCorrect) {
+            this.stats.totalCorrect++;
+            this.stats.totalAnswered++;
+            this.saveData();
+        }
+    },
+
+    removeWrong(id) {
+        this.wrongQuestions = this.wrongQuestions.filter(w => w.id !== id);
+        this.saveData();
+        this.showToast('已移除');
+        this.renderWrongBook();
+    },
+
+    confirmClearWrong() {
+        this.showModal(`
+            <div class="text-center">
+                <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </div>
+                <h3 class="text-lg font-bold text-gray-900 mb-2">确认清空错题本？</h3>
+                <p class="text-gray-600 mb-6">共 ${this.wrongQuestions.length} 道错题将被删除，此操作不可恢复</p>
+                <div class="flex space-x-3">
+                    <button onclick="app.closeModal()" class="flex-1 bg-gray-200 text-gray-700 py-2.5 rounded-xl font-medium hover:bg-gray-300 transition">取消</button>
+                    <button onclick="app.clearWrongBook()" class="flex-1 bg-red-600 text-white py-2.5 rounded-xl font-medium hover:bg-red-700 transition">确认清空</button>
+                </div>
+            </div>
+        `);
+    },
+
+    clearWrongBook() {
+        this.wrongQuestions = [];
+        this.saveData();
+        this.closeModal();
+        this.showToast('错题本已清空');
+        this.renderWrongBook();
+    },
+
+    // ==================== 历史成绩 ====================
+    renderHistory() {
+        const main = document.getElementById('mainContent');
+        const history = [...this.examHistory].reverse().filter(h => h.level === this.currentLevel);
+
+        main.innerHTML = `
+            <div class="fade-in">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-gray-900">历史成绩</h2>
+                    <p class="text-gray-500 text-sm mt-1">大学英语${this.currentLevel === 'cet4' ? '四级' : '六级'}历次模考分数变化趋势</p>
+                </div>
+
+                ${history.length === 0 ? `
+                    <div class="bg-white rounded-2xl exam-shadow p-12 text-center">
+                        <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">暂无成绩记录</h3>
+                        <p class="text-gray-500 mb-6">完成一次全真模拟考试后，成绩将显示在这里</p>
+                        <button onclick="app.confirmStartExam()" class="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-medium hover:bg-blue-700 transition">开始模考</button>
+                    </div>
+                ` : `
+                    <!-- 趋势图 -->
+                    <div class="bg-white rounded-2xl exam-shadow p-6 mb-6">
+                        <h3 class="font-bold text-gray-900 mb-4">分数趋势</h3>
+                        <div class="flex items-end space-x-2 h-40 overflow-x-auto pb-2 custom-scrollbar">
+                            ${history.map((h, i) => {
+                                const height = Math.max((h.totalScore / 710) * 100, 8);
+                                return `
+                                    <div class="flex flex-col items-center flex-shrink-0" style="min-width: 50px">
+                                        <span class="text-xs font-bold ${h.totalScore >= 425 ? 'text-green-600' : 'text-orange-500'} mb-1">${h.totalScore}</span>
+                                        <div class="w-8 rounded-t-lg chart-bar ${h.totalScore >= 425 ? 'bg-green-500' : 'bg-orange-400'}" style="height: ${height}%"></div>
+                                        <span class="text-xs text-gray-400 mt-2 transform -rotate-45 origin-top-left whitespace-nowrap">${h.date.split(' ')[0].slice(5)}</span>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+
+                    <!-- 详细列表 -->
+                    <div class="space-y-4">
+                        ${history.map((h, i) => `
+                            <div class="bg-white rounded-2xl exam-shadow p-5 slide-up" style="animation-delay: ${i * 0.05}s">
+                                <div class="flex items-center justify-between mb-4">
+                                    <div>
+                                        <p class="font-bold text-gray-900">${h.date}</p>
+                                        <p class="text-sm text-gray-500">用时 ${h.duration} · 正确率 ${h.accuracy}%</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-3xl font-bold ${h.totalScore >= 425 ? 'text-green-600' : 'text-orange-500'}">${h.totalScore}</p>
+                                        <p class="text-xs text-gray-400">${h.totalScore >= 425 ? '合格' : '未合格'}</p>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-3 gap-3">
+                                    <div class="bg-blue-50 rounded-xl p-3 text-center">
+                                        <p class="text-xs text-blue-600 mb-1">听力</p>
+                                        <p class="font-bold text-blue-700">${h.listeningScore}</p>
+                                    </div>
+                                    <div class="bg-green-50 rounded-xl p-3 text-center">
+                                        <p class="text-xs text-green-600 mb-1">阅读</p>
+                                        <p class="font-bold text-green-700">${h.readingScore}</p>
+                                    </div>
+                                    <div class="bg-yellow-50 rounded-xl p-3 text-center">
+                                        <p class="text-xs text-yellow-600 mb-1">翻译</p>
+                                        <p class="font-bold text-yellow-700">${h.translationScore}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `}
+            </div>
+        `;
+    }
+};
+
+// 初始化
+app.init();
+</script>
+</body>
+</html>
+

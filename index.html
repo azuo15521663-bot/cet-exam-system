@@ -18,6 +18,10 @@
         .nav-current { border: 2px solid #1d4ed8; font-weight: bold; }
         .timer-warning { color: #ef4444; animation: pulse 1s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        @keyframes eq { 0%, 100% { transform: scaleY(0.35); } 50% { transform: scaleY(1); } }
+        .tts-eq span { transform-origin: bottom; animation: eq 0.8s infinite; }
+        .tts-eq span:nth-child(2) { animation-delay: 0.2s; }
+        .tts-eq span:nth-child(3) { animation-delay: 0.4s; }
         .fade-in { animation: fadeIn 0.3s ease-in; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .slide-up { animation: slideUp 0.3s ease-out; }
@@ -233,9 +237,11 @@ const app = {
     examHistory: [],
     stats: { totalAnswered: 0, totalCorrect: 0 },
     currentLevel: 'cet4',
+    tts: { playing: false, currentId: null, utter: null, fullText: '', charIndex: 0, rate: 1, plays: {}, voice: null },
 
     init() {
         this.loadData();
+        this.initTts();
         this.showPage('dashboard');
         window.addEventListener('beforeunload', () => {
             if (this.currentExam) this.saveExamProgress();
@@ -284,7 +290,165 @@ const app = {
         }
     },
 
+    // ==================== 听力语音播放 (Web Speech API) ====================
+    initTts() {
+        if (!('speechSynthesis' in window)) return;
+        const pick = () => {
+            const voices = speechSynthesis.getVoices().filter(v => /^en([-_]|$)/i.test(v.lang));
+            this.tts.voice = voices.find(v => /Google US English/i.test(v.name))
+                || voices.find(v => /Microsoft (Aria|Jenny|Guy|David|Zira|Yi)/i.test(v.name))
+                || voices.find(v => /Samantha|Daniel|Karen|Serena/i.test(v.name))
+                || voices[0] || null;
+        };
+        pick();
+        speechSynthesis.onvoiceschanged = pick;
+    },
+
+    currentQuestion() {
+        if (this.currentPage === 'exam') return this.getExamQuestions()[this.currentQuestionIndex] || null;
+        if (this.currentPage === 'practice') return this.getPracticeQuestions()[this.practiceIndex] || null;
+        return null;
+    },
+
+    splitListening(text) {
+        const i = text.lastIndexOf('\nQ');
+        if (i === -1) return { speech: text, qline: text };
+        return { speech: text.slice(0, i), qline: text.slice(i + 1) };
+    },
+
+    prepareSpeech(text) {
+        return text.replace(/^Passage:\s*/i, '')
+            .replace(/\b([WMQ]\d?):\s*/g, '')
+            .replace(/\n+/g, '. ')
+            .replace(/\s*\.\s*\./g, '.')
+            .trim();
+    },
+
+    renderListeningPlayer(q) {
+        const noTts = !('speechSynthesis' in window);
+        const used = this.tts.plays[q.id] || 0;
+        const left = 3 - used;
+        const isCur = this.tts.playing && this.tts.currentId === q.id;
+        return `
+            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 ${isCur ? 'border-blue-400' : 'border-blue-200'} rounded-xl p-4 mb-5" id="ttsCard">
+                <div class="flex items-center justify-between flex-wrap gap-3">
+                    <div class="flex items-center gap-3">
+                        <button onclick="app.playListening()" id="ttsPlayBtn" ${noTts || this.tts.playing || left <= 0 ? 'disabled' : ''}
+                            class="w-11 h-11 rounded-full ${noTts || this.tts.playing || left <= 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 active:scale-95'} text-white flex items-center justify-center transition flex-shrink-0">
+                            <svg class="w-5 h-5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>
+                        </button>
+                        <button onclick="app.stopListening()" id="ttsStopBtn" ${!this.tts.playing ? 'disabled' : ''}
+                            class="w-9 h-9 rounded-full ${!this.tts.playing ? 'bg-gray-200 cursor-not-allowed text-gray-400' : 'bg-red-500 hover:bg-red-600 text-white active:scale-95'} flex items-center justify-center transition flex-shrink-0">
+                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"></rect></svg>
+                        </button>
+                        <span class="tts-eq flex items-end gap-0.5 h-4 ${isCur ? '' : 'hidden'}" id="ttsPlayingInd">
+                            <span class="w-0.5 h-4 bg-blue-500 rounded" style="height: 60%"></span>
+                            <span class="w-0.5 h-4 bg-blue-500 rounded" style="height: 100%"></span>
+                            <span class="w-0.5 h-4 bg-blue-500 rounded" style="height: 40%"></span>
+                        </span>
+                        <span class="text-sm font-medium text-gray-700">${noTts ? '当前浏览器不支持语音播放' : '点击播放听力原文'}</span>
+                    </div>
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <div class="flex items-center gap-1" id="ttsSpeedGroup">
+                            ${[0.5, 1, 1.5].map(r => `
+                                <button data-rate="${r}" onclick="app.setTtsRate(${r})"
+                                    class="px-2.5 py-1 rounded-lg text-xs font-bold transition ${this.tts.rate === r ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-100'}">${r}x</button>
+                            `).join('')}
+                        </div>
+                        <span class="text-xs text-gray-500">剩余播放: <span id="ttsPlaysLeft" class="font-bold ${left <= 1 ? 'text-red-500' : 'text-blue-600'}">${left}</span>/3</span>
+                    </div>
+                </div>
+                ${left <= 0 ? '<p class="text-xs text-red-500 mt-2">该题播放次数已用完（每题最多3次）</p>' : ''}
+            </div>
+        `;
+    },
+
+    playListening() {
+        if (!('speechSynthesis' in window)) { this.showToast('当前浏览器不支持语音播放'); return; }
+        const q = this.currentQuestion();
+        if (!q || q.type !== 'listening') return;
+        if (this.tts.playing) return;
+        const used = this.tts.plays[q.id] || 0;
+        if (used >= 3) { this.showToast('该题播放次数已用完（3次）'); return; }
+        speechSynthesis.cancel();
+        this.tts.plays[q.id] = used + 1;
+        const parts = this.splitListening(q.question);
+        this.tts.fullText = this.prepareSpeech(parts.speech);
+        this.tts.currentId = q.id;
+        this.tts.charIndex = 0;
+        this.tts.playing = true;
+        this.speakSegment(this.tts.fullText, 0);
+        this.updateTtsUI();
+    },
+
+    speakSegment(text, base) {
+        const u = new SpeechSynthesisUtterance(text);
+        u.rate = this.tts.rate;
+        u.lang = this.tts.voice ? this.tts.voice.lang : 'en-US';
+        if (this.tts.voice) u.voice = this.tts.voice;
+        u.onboundary = (e) => {
+            if (this.tts.utter === u) this.tts.charIndex = base + e.charIndex;
+        };
+        u.onend = () => {
+            if (this.tts.utter === u) {
+                this.tts.playing = false;
+                this.tts.utter = null;
+                this.tts.charIndex = 0;
+                this.updateTtsUI();
+            }
+        };
+        u.onerror = u.onend;
+        this.tts.utter = u;
+        speechSynthesis.speak(u);
+    },
+
+    stopListening() {
+        if ('speechSynthesis' in window) speechSynthesis.cancel();
+        this.tts.playing = false;
+        this.tts.utter = null;
+        this.tts.charIndex = 0;
+        this.updateTtsUI();
+    },
+
+    setTtsRate(rate) {
+        this.tts.rate = rate;
+        if (this.tts.playing && this.tts.utter && this.tts.fullText) {
+            const abs = Math.min(this.tts.charIndex, this.tts.fullText.length);
+            speechSynthesis.cancel();
+            this.tts.playing = true;
+            if (abs > 0) this.speakSegment(this.tts.fullText.slice(abs), abs);
+            else this.speakSegment(this.tts.fullText, 0);
+        }
+        this.updateTtsUI();
+    },
+
+    updateTtsUI() {
+        const q = this.currentQuestion();
+        if (!q || q.type !== 'listening') return;
+        const left = 3 - (this.tts.plays[q.id] || 0);
+        const playBtn = document.getElementById('ttsPlayBtn');
+        const stopBtn = document.getElementById('ttsStopBtn');
+        const leftEl = document.getElementById('ttsPlaysLeft');
+        const ind = document.getElementById('ttsPlayingInd');
+        if (leftEl) { leftEl.textContent = left; leftEl.className = 'font-bold ' + (left <= 1 ? 'text-red-500' : 'text-blue-600'); }
+        if (playBtn) {
+            const dis = !('speechSynthesis' in window) || this.tts.playing || left <= 0;
+            playBtn.disabled = dis;
+            playBtn.className = 'w-11 h-11 rounded-full ' + (dis ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 active:scale-95') + ' text-white flex items-center justify-center transition flex-shrink-0';
+        }
+        if (stopBtn) {
+            stopBtn.disabled = !this.tts.playing;
+            stopBtn.className = 'w-9 h-9 rounded-full ' + (!this.tts.playing ? 'bg-gray-200 cursor-not-allowed text-gray-400' : 'bg-red-500 hover:bg-red-600 text-white active:scale-95') + ' flex items-center justify-center transition flex-shrink-0';
+        }
+        if (ind) ind.classList.toggle('hidden', !(this.tts.playing && this.tts.currentId === q.id));
+        document.querySelectorAll('#ttsSpeedGroup [data-rate]').forEach(b => {
+            const active = parseFloat(b.dataset.rate) === this.tts.rate;
+            b.className = 'px-2.5 py-1 rounded-lg text-xs font-bold transition ' + (active ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-100');
+        });
+    },
+
     showPage(page, params = {}) {
+        this.stopListening();
         this.currentPage = page;
         const nav = document.getElementById('navTimer');
         const main = document.getElementById('mainContent');
@@ -493,6 +657,8 @@ const app = {
         this.closeModal();
         this.examAnswers = {};
         this.examMarked = {};
+        this.tts.plays = {};
+        this.tts.rate = 1;
         this.examStartTime = Date.now();
         this.examTimeLeft = 120 * 60; // 120分钟
         this.currentExam = true;
@@ -569,8 +735,13 @@ const app = {
 
                         <!-- 题目内容 -->
                         <div class="p-6">
-                            <div class="exam-content text-gray-800 mb-6 passage-text">${q.question.replace(/\n/g, '<br>')}</div>
-                            
+                            ${q.type === 'listening' ? `
+                                ${this.renderListeningPlayer(q)}
+                                <div class="exam-content text-gray-800 mb-6 font-semibold">${this.splitListening(q.question).qline.replace(/\n/g, '<br>')}</div>
+                            ` : `
+                                <div class="exam-content text-gray-800 mb-6 passage-text">${q.question.replace(/\n/g, '<br>')}</div>
+                            `}
+
                             <!-- 选项 -->
                             <div class="space-y-3">
                                 ${q.options.map((opt, idx) => {
@@ -674,6 +845,7 @@ const app = {
     prevQuestion() {
         if (this.currentQuestionIndex > 0) {
             this.currentQuestionIndex--;
+            this.stopListening();
             this.renderExam();
         }
     },
@@ -682,12 +854,14 @@ const app = {
         const questions = this.getExamQuestions();
         if (this.currentQuestionIndex < questions.length - 1) {
             this.currentQuestionIndex++;
+            this.stopListening();
             this.renderExam();
         }
     },
 
     goToQuestion(idx) {
         this.currentQuestionIndex = idx;
+        this.stopListening();
         this.renderExam();
     },
 
@@ -867,6 +1041,7 @@ const app = {
         this.practiceIndex = 0;
         this.practiceAnswers = {};
         this.showAnalysis = false;
+        this.tts.plays = {};
         this.showPage('practice');
     },
 
@@ -913,8 +1088,13 @@ const app = {
                     </div>
 
                     <div class="p-6">
-                        <div class="exam-content text-gray-800 mb-6 passage-text">${q.question.replace(/\n/g, '<br>')}</div>
-                        
+                        ${q.type === 'listening' && !this.showAnalysis ? `
+                            ${this.renderListeningPlayer(q)}
+                            <div class="exam-content text-gray-800 mb-6 font-semibold">${this.splitListening(q.question).qline.replace(/\n/g, '<br>')}</div>
+                        ` : `
+                            <div class="exam-content text-gray-800 mb-6 passage-text">${q.question.replace(/\n/g, '<br>')}</div>
+                        `}
+
                         <div class="space-y-3 mb-6">
                             ${q.options.map((opt, idx) => {
                                 const isSelected = userAns.includes(idx);
@@ -938,6 +1118,15 @@ const app = {
                         </div>
 
                         ${this.showAnalysis ? `
+                            ${q.type === 'listening' ? `
+                                <div class="bg-gray-50 rounded-xl p-5 mb-6 border border-gray-100">
+                                    <div class="flex items-center space-x-2 mb-2">
+                                        <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path></svg>
+                                        <span class="font-bold text-gray-700">听力原文</span>
+                                    </div>
+                                    <p class="text-sm text-gray-600 leading-relaxed passage-text">${this.splitListening(q.question).speech.replace(/\n/g, '<br>')}</p>
+                                </div>
+                            ` : ''}
                             <div class="bg-blue-50 rounded-xl p-5 mb-6 border border-blue-100">
                                 <div class="flex items-center space-x-2 mb-3">
                                     <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -974,6 +1163,7 @@ const app = {
         this.practiceIndex = 0;
         this.practiceAnswers = {};
         this.showAnalysis = false;
+        this.stopListening();
         this.renderPractice(c);
     },
 
@@ -1019,6 +1209,7 @@ const app = {
         if (this.practiceIndex > 0) {
             this.practiceIndex--;
             this.showAnalysis = false;
+            this.stopListening();
             this.renderPractice(this.practiceCategory);
         }
     },
@@ -1026,6 +1217,7 @@ const app = {
     nextPractice() {
         this.practiceIndex++;
         this.showAnalysis = false;
+        this.stopListening();
         this.renderPractice(this.practiceCategory);
     },
 
